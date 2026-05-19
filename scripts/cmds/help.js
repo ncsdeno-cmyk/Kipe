@@ -1,167 +1,139 @@
 const fs = require("fs-extra");
-const axios = require("axios");
 const path = require("path");
-const { getPrefix } = global.utils;
-const { commands, aliases } = global.GoatBot;
-
-const BOT_BRAND = "【 🤖 TEAM AVA | Hassan's Bot 】";
+const https = require("https");
 
 module.exports = {
   config: {
     name: "help",
-    version: "2.0",
-    author: "Hassan (AVA Edition)",
-    countDown: 5,
-    role: 0,
-    description: {
-      en: "Show list of commands or details of a specific command"
-    },
-    category: "info",
-    guide: {
-      en: "{pn} [page]\n{pn} [command]"
-    }
+    aliases: ["menu", "commands"],
+    version: "6.2",
+    author: "KIPE",
+    shortDescription: "Show all commands",
+    longDescription: "Show all commands in clean UI",
+    category: "system",
+    guide: "{pn}help [command name]"
   },
 
-  langs: {
-    en: {
-      listPage: 
-`┌─「 ${BOT_BRAND} 」
-│ Commands list (Page %1/%2)
-│ Total available: %3
-│ Prefix: %4
-├─────────────────
-%5
-└─ Type %4help <command> for details`,
-      
-      listCategory: 
-`┌─「 ${BOT_BRAND} 」
-│ Grouped commands
-│ Total: %1
-├─────────────────
-%2
-└─ Type %3help <command>`,
+  onStart: async function ({ message, args, prefix }) {
+    const allCommands = global.GoatBot.commands;
 
-      notFound: "⚠️ Command '%1' not found.",
-      info: 
-`┌─「 COMMAND INFO 」
-│ Name: %1
-│ Description: %2
-│ Aliases: %3
-│ Local aliases: %4
-│ Version: %5
-│ Role: %6
-│ Cooldown: %7s
-│ Author: %8
-├─────────────────
-Usage:
-%9
-└─────────────────`,
-      onlyUsage: "📘 Usage:\n%1",
-      onlyInfo: "ℹ️ Info:\n- Name: %1\n- Description: %2\n- Aliases: %3\n- Version: %4\n- Role: %5",
-      onlyAlias: "🔑 Aliases: %1\nLocal aliases: %2",
-      onlyRole: "👤 Required role: %1",
-      doNotHave: "None",
-      roleText0: "0 (All users)",
-      roleText1: "1 (Group Admin)",
-      roleText2: "2 (Bot Admin)",
-      roleText0setRole: "0 (set role, all users)",
-      roleText1setRole: "1 (set role, group admins)",
-      pageNotFound: "❌ Page %1 does not exist"
-    }
-  },
+    const fancyFont = (str) =>
+      str.replace(/[A-Za-z]/g, (c) => {
+        const map = {
+          A:"𝐀",B:"𝐁",C:"𝐂",D:"𝐃",E:"𝐄",F:"𝐅",G:"𝐆",H:"𝐇",
+          I:"𝐈",J:"𝐉",K:"𝐊",L:"𝐋",M:"𝐌",N:"𝐍",O:"𝐎",P:"𝐏",
+          Q:"𝐐",R:"𝐑",S:"𝐒",T:"𝐓",U:"𝐔",V:"𝐕",W:"𝐖",X:"𝐗",
+          Y:"𝐘",Z:"𝐙",
+          a:"𝐚",b:"𝐛",c:"𝐜",d:"𝐝",e:"𝐞",f:"𝐟",g:"𝐠",h:"𝐡",
+          i:"𝐢",j:"𝐣",k:"𝐤",l:"𝐥",m:"𝐦",n:"𝐧",o:"𝐨",p:"𝐩",
+          q:"𝐪",r:"𝐫",s:"𝐬",t:"𝐭",u:"𝐮",v:"𝐯",w:"𝐰",x:"𝐱",
+          y:"𝐲",z:"𝐳"
+        };
+        return map[c] || c;
+      });
 
-  onStart: async function ({ message, args, event, threadsData, getLang, role, globalData }) {
-    const langCode = await threadsData.get(event.threadID, "data.lang") || global.GoatBot.config.language;
-    const { threadID } = event;
-    const prefix = getPrefix(threadID);
-    let commandName = (args[0] || "").toLowerCase();
+    const categoryFont = (str) =>
+      str.split("").map(c => {
+        const map = {
+          A:"𝙰",B:"𝙱",C:"𝙲",D:"𝙳",E:"𝙴",F:"𝙵",G:"𝙶",H:"𝙷",
+          I:"𝙸",J:"𝙹",K:"𝙺",L:"𝙻",M:"𝙼",N:"𝙽",O:"𝙾",P:"𝙿",
+          Q:"𝚀",R:"𝚁",S:"𝚂",T:"𝚃",U:"𝚄",V:"𝚅",W:"𝚆",X:"𝚇",
+          Y:"𝚈",Z:"𝚉"
+        };
+        return map[c] || c;
+      }).join("");
 
-    let command = commands.get(commandName) || commands.get(aliases.get(commandName));
+    const cleanCategoryName = (text) => text ? text.toLowerCase() : "others";
 
-    // Search in custom aliases
-    const threadData = await threadsData.get(threadID);
-    const aliasesData = threadData.data.aliases || {};
-    if (!command) {
-      for (const cmdName in aliasesData) {
-        if (aliasesData[cmdName].includes(commandName)) {
-          command = commands.get(cmdName);
-          break;
-        }
-      }
+    if (args[0]) {
+      const cmdName = args[0].toLowerCase();
+      const cmd =
+        allCommands.get(cmdName) ||
+        [...allCommands.values()].find(c => c.config.aliases?.includes(cmdName));
+
+      if (!cmd)
+        return message.reply(`❌ Command '${cmdName}' not found!`);
+
+      const usage = typeof cmd.config.guide === "string"
+        ? cmd.config.guide.replace("{pn}", cmd.config.name)
+        : cmd.config.name;
+
+      const infoMsg =
+`╭─ KIPE AI 🤷🏽🙋🏽
+│ 🧩 ${fancyFont(cmd.config.name)}
+│ 🔗 ${cmd.config.aliases?.join(", ") || "None"}
+│ 📁 ${categoryFont((cmd.config.category || "Others").toUpperCase())}
+│ ⚙️ v${cmd.config.version || "1.0"}
+│ 👑 ${cmd.config.author || "Unknown"}
+│ 📝 ${(cmd.config.longDescription || cmd.config.shortDescription || "No description").slice(0, 40)}
+│ 🚀 ${prefix}${usage}
+╰────────────`;
+
+      return message.reply(infoMsg);
     }
 
-    // Search in global aliases
-    if (!command) {
-      const globalAliasesData = await globalData.get('setalias', 'data', []);
-      for (const item of globalAliasesData) {
-        if (item.aliases.includes(commandName)) {
-          command = commands.get(item.commandName);
-          break;
-        }
-      }
+    const categories = {};
+
+    for (const [name, cmd] of allCommands) {
+      const cat = cleanCategoryName(cmd.config.category);
+      if (!categories[cat]) categories[cat] = [];
+      categories[cat].push(name);
     }
 
-    // Show command list
-    if (!command && (!args[0] || !isNaN(args[0]))) {
-      const arrayInfo = [];
-      const page = parseInt(args[0]) || 1;
-      const perPage = 20;
+    const formatCommands = (cmds) =>
+      cmds.sort().map(c => `• ${fancyFont(c)}`).join("\n");
 
-      for (const [name, value] of commands) {
-        if (value.config.role > 1 && role < value.config.role) continue;
-        let desc = checkLangObject(value.config.description, langCode) || "";
-        arrayInfo.push(`${name} — ${desc}`);
-      }
+    let msg =
+`╭─ KIPE AI
+│ 🔧 ${prefix}
+│ 📊 ${allCommands.size} commands
+╰────────────\n`;
 
-      arrayInfo.sort();
-      const totalPage = Math.ceil(arrayInfo.length / perPage);
-      if (page < 1 || page > totalPage) return message.reply(getLang("pageNotFound", page));
-
-      const pageItems = arrayInfo.slice((page - 1) * perPage, page * perPage).join("\n");
-      return message.reply(getLang("listPage", page, totalPage, arrayInfo.length, prefix, pageItems));
+    for (const cat of Object.keys(categories)) {
+      msg += `\n${categoryFont(cat.toUpperCase())}\n`;
+      msg += formatCommands(categories[cat]) + "\n";
     }
 
-    // Command not found
-    if (!command) return message.reply(getLang("notFound", args[0]));
+    msg += `\nUse: ${prefix}help <command>`;
 
-    // Show command info
-    const cfg = command.config;
-    const guide = (cfg.guide?.[langCode] || cfg.guide?.en || "").replace(/\{pn\}/g, prefix + cfg.name);
+    const gifURLs = [
+      "https://i.imgur.com/Xw6JTfn.gif",
+      "https://i.imgur.com/mW0yjZb.gif",
+      "https://i.imgur.com/KQBcxOV.gif"
+    ];
 
-    const aliasesString = cfg.aliases?.join(", ") || getLang("doNotHave");
-    const localAlias = threadData.data.aliases?.[cfg.name]?.join(", ") || getLang("doNotHave");
-    let roleText = cfg.role === 0 ? getLang("roleText0") : cfg.role === 1 ? getLang("roleText1") : getLang("roleText2");
+    const randomGifURL = gifURLs[Math.floor(Math.random() * gifURLs.length)];
+    const gifFolder = path.join(__dirname, "cache");
 
-    if (args[1]?.match(/^-u|usage$/)) {
-      return message.reply(getLang("onlyUsage", guide));
-    }
-    if (args[1]?.match(/^-i|info$/)) {
-      return message.reply(getLang("onlyInfo", cfg.name, cfg.description?.en || "", aliasesString, cfg.version, roleText));
-    }
-    if (args[1]?.match(/^-a|alias$/)) {
-      return message.reply(getLang("onlyAlias", aliasesString, localAlias));
-    }
-    if (args[1]?.match(/^-r|role$/)) {
-      return message.reply(getLang("onlyRole", roleText));
-    }
+    if (!fs.existsSync(gifFolder))
+      fs.mkdirSync(gifFolder, { recursive: true });
 
-    return message.reply(getLang(
-      "info",
-      cfg.name,
-      cfg.description?.en || "",
-      aliasesString,
-      localAlias,
-      cfg.version,
-      roleText,
-      cfg.countDown || 1,
-      cfg.author || "",
-      guide
-    ));
+    const gifName = path.basename(randomGifURL);
+    const gifPath = path.join(gifFolder, gifName);
+
+    if (!fs.existsSync(gifPath))
+      await downloadGif(randomGifURL, gifPath);
+
+    return message.reply({
+      body: msg,
+      attachment: fs.createReadStream(gifPath)
+    });
   }
 };
 
-function checkLangObject(data, langCode) {
-  if (typeof data == "string") return data;
-  if (typeof data == "object" && !Array.isArray(data)) return data[langCode] || data.en || undefined;
-  return undefined;
-}
+function downloadGif(url, dest) {
+  return new Promise((resolve, reject) => {
+    const file = fs.createWriteStream(dest);
+    https.get(url, (res) => {
+      if (res.statusCode !== 200) {
+        fs.unlink(dest, () => {});
+        return reject();
+      }
+      res.pipe(file);
+      file.on("finish", () => file.close(resolve));
+    }).on("error", (err) => {
+      fs.unlink(dest, () => {});
+      reject(err);
+    });
+  });
+    }
